@@ -855,7 +855,9 @@ header {
       onkeydown="if(event.key==='Enter')checkVolunteerCode()">
     <button class="btn btn-primary" style="width:100%;margin-bottom:10px;padding:12px" onclick="checkVolunteerCode()">כניסה</button>
     <div id="vol-login-error" style="color:#f87171;font-size:12px;margin-bottom:10px;display:none">⛔ קוד שגוי — פנה לקצין המתנדבים</div>
-    <button class="btn btn-ghost btn-sm" style="width:100%" onclick="enterAsViewer()">👁️ כניסה כצופה בלבד</button>
+    <div style="height:1px;background:rgba(255,255,255,.1);margin:10px 0"></div>
+    <button class="btn btn-ghost btn-sm" style="width:100%;margin-bottom:6px" onclick="showAdminLoginFromScreen()">🔐 כניסת מנהל</button>
+    <button class="btn btn-ghost btn-sm" style="width:100%;opacity:.6" onclick="enterAsViewer()">👁️ צפייה בלוח בלבד</button>
     <div style="margin-top:14px;font-size:11px;color:var(--gray-500)">הקוד מועבר אליך על ידי קצין המתנדבים</div>
   </div>
 </div>
@@ -1175,12 +1177,28 @@ function promptAdminLogin(){
   document.getElementById('pw-screen').style.display='flex';
   setTimeout(()=>document.getElementById('admin-pw-input').focus(),100);
 }
-function cancelAdminLogin(){ document.getElementById('pw-screen').style.display='none'; }
+function showAdminLoginFromScreen(){
+  // הסתר מסך מתנדבים ← הצג מסך מנהל
+  document.getElementById('vol-login-screen').style.display='none';
+  document.getElementById('admin-pw-input').value='';
+  document.getElementById('pw-error').style.display='none';
+  document.getElementById('pw-screen').style.display='flex';
+  setTimeout(()=>document.getElementById('admin-pw-input').focus(),100);
+}
+
+function cancelAdminLogin(){
+  document.getElementById('pw-screen').style.display='none';
+  // חזור למסך כניסת מתנדבים
+  document.getElementById('vol-login-screen').style.display='flex';
+}
 function checkAdminPw(){
   const pw=document.getElementById('admin-pw-input').value;
   if(pw===ADMIN_PASSWORD){
     isAdmin=true;
+    isLoggedIn=true;
+    MY_NAME='מנהל';
     document.getElementById('pw-screen').style.display='none';
+    document.getElementById('vol-login-screen').style.display='none';
     document.getElementById('admin-tab').style.display='flex';
     document.getElementById('admin-toggle-btn').textContent='🔓 יציאת מנהל';
     document.getElementById('btn-add-event').style.display='flex';
