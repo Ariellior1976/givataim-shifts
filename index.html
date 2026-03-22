@@ -2,8 +2,16 @@
 <html lang="he" dir="rtl">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="מתנדבי גבעתיים">
+<meta name="application-name" content="מתנדבי גבעתיים">
+<meta name="theme-color" content="#0a1628">
+<meta name="description" content="מערכת השתבצות משמרות | תחנת משטרת גבעתיים">
 <title>מערכת השתבצות משמרות | תחנת גבעתיים</title>
+<link rel="manifest" href="manifest.json">
 <link href="https://fonts.googleapis.com/css2?family=Heebo:wght@300;400;500;600;700;900&display=swap" rel="stylesheet">
 <style>
 :root {
@@ -324,6 +332,87 @@ header {
 .text-gold{color:var(--gold);} .text-sm{font-size:12px;color:var(--gray-500);}
 ::-webkit-scrollbar{width:6px;height:6px;} ::-webkit-scrollbar-track{background:transparent;} ::-webkit-scrollbar-thumb{background:rgba(255,255,255,.15);border-radius:3px;}
 @media(max-width:900px){.stats-row{grid-template-columns:repeat(2,1fr);} .admin-grid{grid-template-columns:1fr;} .week-grid{font-size:10px;}}
+
+/* === MOBILE VIEW === */
+@media(max-width:640px){
+  header { height:56px; padding:0 12px; }
+  .brand-text h1 { font-size:14px; }
+  .brand-text p { display:none; }
+  .header-right { gap:8px; }
+  .btn-switch-role { font-size:10px; padding:4px 8px; }
+  .nav-tabs { padding:8px 12px; gap:2px; }
+  .tab-btn { padding:6px 10px; font-size:12px; }
+  .main { padding:12px; }
+  .stats-row { grid-template-columns:repeat(2,1fr); gap:8px; margin-bottom:14px; }
+  .stat-card { padding:12px; }
+  .stat-num { font-size:22px; }
+
+  /* Mobile: nasconde il weekly grid, mostra daily view */
+  #week-grid { display:none; }
+  #mobile-daily-view { display:block; }
+  .week-nav-mobile { display:flex !important; }
+
+  /* Month cells smaller */
+  .month-cell { min-height:60px; padding:4px; }
+  .day-num { font-size:11px; }
+  .month-shift-dot { font-size:8px; padding:1px 3px; }
+}
+
+@media(min-width:641px){
+  #mobile-daily-view { display:none; }
+  .week-nav-mobile { display:none !important; }
+}
+
+/* DAILY VIEW (mobile) */
+.daily-nav {
+  display:flex; align-items:center; justify-content:space-between;
+  margin-bottom:14px; background:rgba(255,255,255,.04);
+  border-radius:10px; padding:10px 16px;
+}
+.daily-date-label { font-size:15px; font-weight:700; text-align:center; }
+.daily-date-sub { font-size:11px; color:var(--gray-500); text-align:center; }
+
+.daily-shift-card {
+  background:var(--card-bg); border:1px solid var(--card-border);
+  border-radius:14px; margin-bottom:12px; overflow:hidden;
+}
+.daily-shift-header {
+  padding:12px 16px; display:flex; align-items:center; justify-content:space-between;
+  border-bottom:1px solid var(--card-border);
+}
+.daily-shift-title { font-size:15px; font-weight:700; display:flex; align-items:center; gap:8px; }
+.daily-shift-time { font-size:11px; color:var(--gray-500); }
+.daily-shift-body { padding:12px 16px; }
+
+.daily-section-label {
+  font-size:10px; font-weight:700; color:var(--gray-500);
+  text-transform:uppercase; letter-spacing:.05em; margin-bottom:8px;
+  display:flex; align-items:center; justify-content:space-between;
+}
+.daily-vol-row {
+  display:flex; align-items:center; gap:10px;
+  background:rgba(255,255,255,.04); border-radius:8px;
+  padding:8px 12px; margin-bottom:6px; font-size:13px;
+}
+.daily-vol-row.me { background:rgba(37,99,235,.15); border:1px solid rgba(37,99,235,.3); }
+.daily-vol-row.standby-row { background:rgba(190,24,93,.1); border:1px solid rgba(190,24,93,.2); }
+.daily-police-row {
+  display:flex; align-items:center; gap:8px;
+  padding:6px 12px; font-size:12px; color:#93c5fd;
+}
+.daily-action-btn {
+  width:100%; padding:11px; border-radius:10px; border:none; cursor:pointer;
+  font-family:'Heebo',sans-serif; font-size:14px; font-weight:600;
+  transition:all .2s; margin-top:8px;
+}
+.daily-action-btn.join { background:rgba(37,99,235,.25); color:#93c5fd; border:1px dashed rgba(37,99,235,.5); }
+.daily-action-btn.leave { background:rgba(220,38,38,.15); color:#f87171; border:1px solid rgba(220,38,38,.3); }
+.daily-action-btn.standby-join { background:rgba(190,24,93,.2); color:var(--standby-light); border:1px dashed rgba(190,24,93,.4); }
+.daily-action-btn.standby-leave { background:rgba(190,24,93,.1); color:var(--standby-light); border:1px solid rgba(190,24,93,.3); }
+.daily-action-btn.full { background:rgba(100,116,139,.1); color:var(--gray-500); border:1px solid var(--card-border); cursor:default; }
+.daily-status-bar {
+  height:4px; border-radius:2px; margin-bottom:12px;
+}
 </style>
 </head>
 <body>
@@ -406,6 +495,19 @@ header {
       </div>
     </div>
     <div class="week-grid" id="week-grid"></div>
+
+    <!-- MOBILE DAILY VIEW -->
+    <div id="mobile-daily-view">
+      <div class="daily-nav">
+        <button class="btn btn-ghost btn-sm" onclick="changeDailyDate(-1)">→</button>
+        <div>
+          <div class="daily-date-label" id="daily-date-label"></div>
+          <div class="daily-date-sub" id="daily-date-sub"></div>
+        </div>
+        <button class="btn btn-ghost btn-sm" onclick="changeDailyDate(1)">←</button>
+      </div>
+      <div id="daily-shifts-container"></div>
+    </div>
   </div>
 
   <!-- MONTH VIEW -->
@@ -874,7 +976,7 @@ function switchTab(name, btn){
   document.getElementById('view-'+name).classList.add('active');
   if(btn) btn.classList.add('active');
   activeTab = name;
-  if(name==='week') renderWeek();
+  if(name==='week') { renderWeek(); renderDailyView(); }
   if(name==='month') renderMonth();
   if(name==='events') renderEvents();
   if(name==='standby') renderStandbyView();
@@ -883,12 +985,114 @@ function switchTab(name, btn){
 }
 function renderAll(){
   renderStats();
-  if(activeTab==='week') renderWeek();
+  if(activeTab==='week') { renderWeek(); renderDailyView(); }
   else if(activeTab==='month') renderMonth();
   else if(activeTab==='events') renderEvents();
   else if(activeTab==='standby') renderStandbyView();
   else if(activeTab==='mine') renderMine();
   else if(activeTab==='admin') renderAdmin();
+}
+
+// ============================================================
+// MOBILE DAILY VIEW
+// ============================================================
+let currentDailyDate = new Date(today);
+
+function changeDailyDate(dir){
+  currentDailyDate = addDays(currentDailyDate, dir);
+  renderDailyView();
+}
+
+function renderDailyView(){
+  const d = currentDailyDate;
+  const ds = formatDate(d);
+  const isT = sameDay(d, today);
+  const labelEl = document.getElementById('daily-date-label');
+  const subEl = document.getElementById('daily-date-sub');
+  const container = document.getElementById('daily-shifts-container');
+  if(!labelEl || !container) return;
+
+  labelEl.textContent = `${DAYS_HE[d.getDay()]} ${d.getDate()} ${MONTHS_HE[d.getMonth()]} ${d.getFullYear()}`;
+  subEl.textContent = isT ? '🔴 היום' : '';
+
+  let html = '';
+  SHIFT_TYPES.forEach(type => {
+    const sl = getSlot(ds, type);
+    const count = sl.volunteers.length;
+    const sbCount = (sl.standby||[]).length;
+    const sc = slotStatus(count);
+    const barColor = sc==='empty'?'rgba(220,38,38,.6)':sc==='single'?'rgba(245,158,11,.7)':'rgba(22,163,74,.7)';
+    const locked = sl.locked;
+
+    html += `<div class="daily-shift-card">
+      <div class="daily-shift-header" style="border-right:4px solid ${SHIFT_COLORS[type]}">
+        <div>
+          <div class="daily-shift-title">${SHIFT_LABELS[type]}</div>
+          <div class="daily-shift-time">${SHIFT_TIMES[type]}</div>
+        </div>
+        <div style="text-align:center">
+          <div style="font-size:11px;color:var(--gray-500)">מתנדבים</div>
+          <div style="font-size:18px;font-weight:700;color:${sc==='full'?'#4ade80':sc==='single'?'var(--gold-light)':'#f87171'}">${count}/${SHIFT_MAX_VOLUNTEERS}</div>
+        </div>
+      </div>
+      <div class="daily-shift-body">
+        <div class="daily-status-bar" style="background:${barColor}"></div>`;
+
+    // מתנדבים
+    html += `<div class="daily-section-label"><span>👥 מתנדבים</span></div>`;
+    if(count === 0){
+      html += `<div style="font-size:12px;color:var(--gray-500);font-style:italic;margin-bottom:8px">אין מתנדבים רשומים</div>`;
+    } else {
+      sl.volunteers.forEach(v=>{
+        const hrs = sl.volunteerHours?.[v]||'';
+        html += `<div class="daily-vol-row ${v===MY_NAME?'me':''}">
+          <span>${v===MY_NAME?'⭐ אני':v}</span>
+          ${hrs?`<span style="font-size:11px;color:var(--gray-500);margin-right:auto">🕐 ${hrs}</span>`:''}
+        </div>`;
+      });
+    }
+    if(!locked){
+      if(sl.isMine){
+        html += `<button class="daily-action-btn leave" onclick="toggleSlot('${ds}','${type}')">✕ ביטול השתבצות</button>`;
+      } else if(isAdmin || count < SHIFT_MAX_VOLUNTEERS){
+        html += `<button class="daily-action-btn join" onclick="toggleSlot('${ds}','${type}')">+ השתבץ למשמרת</button>`;
+      } else {
+        html += `<button class="daily-action-btn full" disabled>⛔ המשמרת מלאה</button>`;
+      }
+    }
+
+    // כוננות
+    html += `<div class="daily-section-label" style="margin-top:14px"><span>🔴 כוננות</span><span>${sbCount}/${SHIFT_MAX_VOLUNTEERS}</span></div>`;
+    if(sbCount === 0){
+      html += `<div style="font-size:12px;color:var(--gray-500);font-style:italic;margin-bottom:8px">אין חברי כוננות</div>`;
+    } else {
+      (sl.standby||[]).forEach(v=>{
+        const hrs = sl.standbyHours?.[v]||'';
+        html += `<div class="daily-vol-row standby-row">
+          <span style="color:var(--standby-light)">${v===MY_NAME?'⭐ אני':v}</span>
+          ${hrs?`<span style="font-size:11px;color:var(--gray-500);margin-right:auto">🕐 ${hrs}</span>`:''}
+        </div>`;
+      });
+    }
+    if(!locked){
+      if(sl.isMineStandby){
+        html += `<button class="daily-action-btn standby-leave" onclick="toggleStandbySlot('${ds}','${type}')">✕ ביטול כוננות</button>`;
+      } else if(isAdmin || sbCount < SHIFT_MAX_VOLUNTEERS){
+        html += `<button class="daily-action-btn standby-join" onclick="toggleStandbySlot('${ds}','${type}')">🔴 הצטרף לכוננות</button>`;
+      } else {
+        html += `<button class="daily-action-btn full" disabled>⛔ כוננות מלאה</button>`;
+      }
+    }
+
+    // שוטרים
+    if(sl.police && sl.police.length){
+      html += `<div class="daily-section-label" style="margin-top:14px"><span>👮 שוטרים סדירים</span></div>`;
+      sl.police.forEach(p=>{ html += `<div class="daily-police-row">👮 ${p}</div>`; });
+    }
+    if(locked) html += `<div style="font-size:12px;color:#f87171;text-align:center;padding:8px">🔒 משמרת נעולה</div>`;
+    html += `</div></div>`;
+  });
+  container.innerHTML = html;
 }
 
 // ============================================================
@@ -1895,7 +2099,7 @@ function showToast(msg,type=''){
 // ============================================================
 // INIT
 // ============================================================
-renderStats(); renderWeek(); renderMonth(); renderEvents(); renderMine();
+renderStats(); renderWeek(); renderDailyView(); renderMonth(); renderEvents(); renderMine();
 </script>
 </body>
 </html>
