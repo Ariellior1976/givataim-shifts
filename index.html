@@ -1529,6 +1529,8 @@ function collectExportRows(from, to) {
       polCount: 0,
       locked: sbList.length === STANDBY_MAX ? 'מלא' : `${sbList.length}/${STANDBY_MAX}`
     });
+    // events on this day
+    events.filter(ev => ev.date === ds).forEach(ev => {
       rows.push({
         date: ds,
         dayName: DAYS_HE[d.getDay()],
