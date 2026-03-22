@@ -370,9 +370,9 @@ header {
     <div class="legend-bar">
       <div class="lg-group">
         <span style="font-size:10px;font-weight:700;color:var(--gray-500);text-transform:uppercase;letter-spacing:.05em">כיסוי מתנדבים</span>
-        <div class="li"><div class="li-bar" style="background:rgba(220,38,38,.6)"></div>אין מתנדבים ⚠️</div>
-        <div class="li"><div class="li-bar" style="background:rgba(245,158,11,.7)"></div>מתנדב אחד ⚠️</div>
-        <div class="li"><div class="li-bar" style="background:rgba(22,163,74,.7)"></div>שניים ומעלה ✅</div>
+        <div class="li"><div class="li-bar" style="background:rgba(220,38,38,.6)"></div>אין מתנדבים</div>
+        <div class="li"><div class="li-bar" style="background:rgba(245,158,11,.7)"></div>מתנדב אחד</div>
+        <div class="li"><div class="li-bar" style="background:rgba(22,163,74,.7)"></div>שניים (מלא)</div>
       </div>
       <div class="lg-sep"></div>
       <div class="lg-group">
@@ -719,8 +719,16 @@ const DAYS_HE = ['ראשון','שני','שלישי','רביעי','חמישי','�
 const MONTHS_HE = ['ינואר','פברואר','מרץ','אפריל','מאי','יוני','יולי','אוגוסט','ספטמבר','אוקטובר','נובמבר','דצמבר'];
 const SHIFT_TYPES = ['morning','afternoon','night'];
 const SHIFT_LABELS = { morning:'🌅 בוקר', afternoon:'☀️ צהריים', night:'🌙 לילה' };
-const SHIFT_TIMES  = { morning:'06:00–14:00', afternoon:'14:00–22:00', night:'22:00–06:00' };
+const SHIFT_TIMES  = { morning:'06:30–14:30', afternoon:'14:30–21:30', night:'21:30–06:30' };
 const SHIFT_COLORS = { morning:'#f59e0b', afternoon:'#2563eb', night:'#818cf8' };
+const SHIFT_MAX_VOLUNTEERS = 2; // מקסימום מתנדבים למשמרת (ללא מנהל)
+
+// שעות אפשריות לכל משמרת
+const SHIFT_HOURS = {
+  morning:   ['06:30','07:00','07:30','08:00','08:30','09:00','09:30','10:00','10:30','11:00','11:30','12:00','12:30','13:00','13:30','14:00','14:30'],
+  afternoon: ['14:30','15:00','15:30','16:00','16:30','17:00','17:30','18:00','18:30','19:00','19:30','20:00','20:30','21:00','21:30'],
+  night:     ['21:30','22:00','22:30','23:00','23:30','00:00','00:30','01:00','01:30','02:00','02:30','03:00','03:00','03:30','04:00','04:30','05:00','05:30','06:00','06:30'],
+};
 const ADMIN_PASSWORD = 'givataim2025'; // ← ניתן לשנות
 
 const MY_NAME = 'אתה'; // שם המתנדב המחובר (ב-MVP)
@@ -760,11 +768,25 @@ function parseDate(s){ const [y,m,d]=s.split('-').map(Number); return new Date(y
 
 function ensureSlot(date, type){
   if(!slots[date]) slots[date]={};
-  if(!slots[date][type]) slots[date][type]={volunteers:[],isMine:false,locked:false,police:[]};
-  return slots[date][type];
+  if(!slots[date][type]) slots[date][type]={
+    volunteers:[], isMine:false, locked:false, police:[],
+    standby:[], isMineStandby:false,
+    volunteerHours:{}, standbyHours:{}
+  };
+  // backward compat
+  const sl = slots[date][type];
+  if(!sl.standby) sl.standby=[];
+  if(!sl.standbyHours) sl.standbyHours={};
+  if(!sl.volunteerHours) sl.volunteerHours={};
+  return sl;
 }
-function getSlot(date, type){ return slots[date]?.[type] || {volunteers:[],isMine:false,locked:false,police:[]}; }
-function slotStatus(count){ return count===0?'empty':count===1?'single':'full'; }
+function getSlot(date, type){
+  return slots[date]?.[type] || {
+    volunteers:[],isMine:false,locked:false,police:[],
+    standby:[],isMineStandby:false,volunteerHours:{},standbyHours:{}
+  };
+}
+function slotStatus(count){ return count===0?'empty':count<SHIFT_MAX_VOLUNTEERS?'single':'full'; }
 
 // ============================================================
 // SEED DATA
@@ -787,6 +809,14 @@ function slotStatus(count){ return count===0?'empty':count===1?'single':'full'; 
   seed(3,'morning',[MY_NAME],true,['רנ"צ פרץ מ.']);
   seed(-1,'afternoon',[MY_NAME,'יוסי כהן'],true,['רס"ל בן-אלי','סמ"ר כהן ע.']);
   seed(-2,'morning',['דוד מזרחי','נועה שפירא'],false,['רנ"צ דוד ה.']);
+  // דוגמאות לכוננות במשמרות
+  const d0=formatDate(today);
+  ensureSlot(d0,'morning').standby=['כרמל גבאי'];
+  ensureSlot(d0,'morning').standbyHours={'כרמל גבאי':'07:00–11:00'};
+  const d1=formatDate(addDays(today,1));
+  ensureSlot(d1,'afternoon').standby=[MY_NAME];
+  ensureSlot(d1,'afternoon').isMineStandby=true;
+  ensureSlot(d1,'afternoon').standbyHours={[MY_NAME]:'15:00–19:00'};
   // Lock a past shift as example
   const pastDate = formatDate(addDays(today,-2));
   if(slots[pastDate]?.morning) slots[pastDate].morning.locked=true;
@@ -886,19 +916,52 @@ function renderWeek(){
       const sl=getSlot(ds,type);
       const count=sl.volunteers.length; const sc=slotStatus(count);
       const locked=sl.locked;
-      html+=`<div class="week-cell" onclick="openSlotModal('${ds}','${type}')">`;
+      html+=`<div class="week-cell" onclick="openHoursModal('${ds}','${type}')">`;
       if(locked) html+=`<div class="cell-locked-overlay"><span class="lock-icon">🔒</span></div>`;
       // Volunteer section
       html+=`<div class="cell-section">`;
       html+=`<div class="slot-status-bar ${sc}"></div>`;
-      html+=`<div class="slot-header"><span class="slot-count-num ${sc}">${count}</span><span class="slot-section-label">מתנדב${count!==1?'ים':''}</span>${count<2?`<span style="font-size:9px;color:${count===0?'#f87171':'var(--gold-light)'}">${count===0?'⚠️':'⚠️'}</span>`:''}</div>`;
+      html+=`<div class="slot-header"><span class="slot-count-num ${sc}">${count}</span><span class="slot-section-label">/${SHIFT_MAX_VOLUNTEERS}</span>${!isAdmin&&count>=SHIFT_MAX_VOLUNTEERS?'<span style="font-size:9px;color:#f87171">מלא</span>':count===0?'<span style="font-size:9px;color:#f87171">⚠️</span>':''}</div>`;
       if(sl.volunteers.length){
         html+=`<div class="vol-list">`;
-        sl.volunteers.forEach(v=>{ html+=`<span class="vol-chip ${v===MY_NAME?'me':''}">${v===MY_NAME?'⭐אני':v}</span>`; });
+        sl.volunteers.forEach(v=>{
+          const hrs=sl.volunteerHours?.[v]||'';
+          html+=`<span class="vol-chip ${v===MY_NAME?'me':''}">${v===MY_NAME?'⭐אני':v}${hrs?` <small style="opacity:.7">${hrs}</small>`:''}</span>`;
+        });
         html+=`</div>`;
       }
       if(!locked){
-        html+=`<button class="cell-action-btn ${sl.isMine?'leave':'join'}" onclick="event.stopPropagation();toggleSlot('${ds}','${type}')">${sl.isMine?'✕ בטל':'+ השתבץ'}</button>`;
+        if(sl.isMine){
+          html+=`<button class="cell-action-btn leave" onclick="event.stopPropagation();toggleSlot('${ds}','${type}')">✕ בטל</button>`;
+        } else if(isAdmin || count < SHIFT_MAX_VOLUNTEERS){
+          html+=`<button class="cell-action-btn join" onclick="event.stopPropagation();toggleSlot('${ds}','${type}')">+ השתבץ</button>`;
+        } else {
+          html+=`<div style="font-size:9px;color:#f87171;text-align:center;padding:2px">מלא</div>`;
+        }
+      }
+      html+=`</div>`;
+      // Divider + Standby section
+      html+=`<div class="cell-divider">🔴 כוננות</div>`;
+      html+=`<div class="cell-section">`;
+      const sbCount=sl.standby?sl.standby.length:0;
+      const sbSc=slotStatus(sbCount);
+      html+=`<div class="slot-header"><span class="slot-count-num ${sbSc}" style="font-size:12px">${sbCount}</span><span class="slot-section-label">/${SHIFT_MAX_VOLUNTEERS}</span></div>`;
+      if(sl.standby && sl.standby.length){
+        html+=`<div class="vol-list">`;
+        sl.standby.forEach(v=>{
+          const hrs=sl.standbyHours?.[v]||'';
+          html+=`<span class="vol-chip" style="background:rgba(190,24,93,.2);color:var(--standby-light)">${v===MY_NAME?'⭐אני':v}${hrs?` <small style="opacity:.7">${hrs}</small>`:''}</span>`;
+        });
+        html+=`</div>`;
+      }
+      if(!locked){
+        if(sl.isMineStandby){
+          html+=`<button class="cell-action-btn leave" style="background:rgba(190,24,93,.15);color:var(--standby-light);border-color:rgba(190,24,93,.3)" onclick="event.stopPropagation();toggleStandbySlot('${ds}','${type}')">✕ בטל</button>`;
+        } else if(isAdmin || sbCount < SHIFT_MAX_VOLUNTEERS){
+          html+=`<button class="cell-action-btn join" style="background:rgba(190,24,93,.15);color:var(--standby-light);border-color:rgba(190,24,93,.3)" onclick="event.stopPropagation();toggleStandbySlot('${ds}','${type}')">🔴 כוננות</button>`;
+        } else {
+          html+=`<div style="font-size:9px;color:#f87171;text-align:center;padding:2px">מלא</div>`;
+        }
       }
       html+=`</div>`;
       // Divider + Police section
@@ -917,69 +980,213 @@ function renderWeek(){
 }
 
 // ============================================================
-// SLOT TOGGLE
+// STANDBY SLOT TOGGLE (per shift)
 // ============================================================
+function toggleStandbySlot(date, type){
+  const sl = ensureSlot(date, type);
+  if(sl.locked && !isAdmin){ showToast('⛔ משמרת נעולה','error'); return; }
+  if(sl.isMineStandby){
+    sl.isMineStandby = false;
+    sl.standby = sl.standby.filter(v=>v!==MY_NAME);
+    delete sl.standbyHours[MY_NAME];
+    showToast('הסרת עצמך מכוננות');
+    renderAll();
+  } else {
+    if(!isAdmin && (sl.standby||[]).length >= SHIFT_MAX_VOLUNTEERS){
+      showToast(`⛔ כוננות מלאה (${SHIFT_MAX_VOLUNTEERS})`, 'error'); return;
+    }
+    openStandbyHoursModal(date, type);
+  }
+}
+
+function openStandbyHoursModal(date, type){
+  const d = parseDate(date);
+  const hours = SHIFT_HOURS[type];
+  const sl = getSlot(date, type);
+
+  document.getElementById('detail-title').textContent =
+    `🔴 כוננות | ${SHIFT_LABELS[type]} | ${DAYS_HE[d.getDay()]} ${d.getDate()} ${MONTHS_HE[d.getMonth()]}`;
+
+  let body = `
+    <div style="background:rgba(190,24,93,.08);border:1px solid rgba(190,24,93,.2);border-radius:10px;padding:12px 16px;margin-bottom:16px;font-size:13px">
+      <div style="color:var(--standby-light);margin-bottom:4px">🔴 השתבצות לכוננות — ${SHIFT_TIMES[type]}</div>
+      <div style="color:var(--gray-500);font-size:11px">בחר את השעות שבהן תהיה זמין להקפצה</div>
+    </div>
+    <div class="form-row" style="margin-bottom:16px">
+      <div class="form-group">
+        <label class="form-label">שעת התחלה</label>
+        <select class="form-select" id="sb-hour-start" onchange="updateSbEndHours('${type}')">
+          ${hours.slice(0,-1).map(h=>`<option value="${h}">${h}</option>`).join('')}
+        </select>
+      </div>
+      <div class="form-group">
+        <label class="form-label">שעת סיום</label>
+        <select class="form-select" id="sb-hour-end">
+          ${hours.slice(1).map(h=>`<option value="${h}">${h}</option>`).join('')}
+        </select>
+      </div>
+    </div>`;
+
+  if(sl.standby && sl.standby.length){
+    body += `<div class="form-label" style="margin-bottom:8px">חברי כוננות רשומים:</div>
+    <div style="display:flex;flex-direction:column;gap:6px;margin-bottom:14px">`;
+    sl.standby.forEach(v=>{
+      const hrs = sl.standbyHours?.[v]||'';
+      body += `<div style="display:flex;align-items:center;gap:8px;background:rgba(190,24,93,.08);border-radius:8px;padding:8px 12px">
+        <span style="font-size:11px;color:var(--standby-light)">🔴 ${v===MY_NAME?'אני':v}</span>
+        ${hrs?`<span style="font-size:11px;color:var(--gray-500)">🕐 ${hrs}</span>`:''}
+      </div>`;
+    });
+    body += `</div>`;
+  }
+
+  document.getElementById('detail-body').innerHTML = body;
+  document.getElementById('detail-actions').innerHTML =
+    `<button class="btn btn-sm" style="background:var(--standby-bg);color:var(--standby-light);border:1px solid rgba(190,24,93,.4)" onclick="confirmStandbyHours('${date}','${type}')">✓ אשר כוננות</button>
+     <button class="btn btn-ghost" onclick="closeModal('shift-detail')">ביטול</button>`;
+  document.getElementById('modal-shift-detail').classList.add('open');
+}
+
+function updateSbEndHours(type){
+  const startVal = document.getElementById('sb-hour-start').value;
+  const hours = SHIFT_HOURS[type];
+  const startIdx = hours.indexOf(startVal);
+  const endSel = document.getElementById('sb-hour-end');
+  endSel.innerHTML = hours.slice(startIdx+1).map(h=>`<option value="${h}">${h}</option>`).join('');
+}
+
+function confirmStandbyHours(date, type){
+  const start = document.getElementById('sb-hour-start')?.value;
+  const end   = document.getElementById('sb-hour-end')?.value;
+  if(!start||!end){ showToast('יש לבחור שעות','error'); return; }
+  const sl = ensureSlot(date, type);
+  if(!isAdmin && (sl.standby||[]).length >= SHIFT_MAX_VOLUNTEERS){
+    showToast('⛔ כוננות מלאה','error'); return;
+  }
+  sl.isMineStandby = true;
+  if(!sl.standby) sl.standby=[];
+  if(!sl.standby.includes(MY_NAME)) sl.standby.unshift(MY_NAME);
+  if(!sl.standbyHours) sl.standbyHours={};
+  sl.standbyHours[MY_NAME] = `${start}–${end}`;
+  closeModal('shift-detail');
+  showToast('✅ נרשמת לכוננות!','success');
+  renderAll();
+}
 function toggleSlot(date,type){
   const sl=ensureSlot(date,type);
   if(sl.locked && !isAdmin){ showToast('⛔ משמרת זו נעולה על ידי המנהל','error'); return; }
   if(sl.isMine){
-    sl.isMine=false; sl.volunteers=sl.volunteers.filter(v=>v!==MY_NAME);
+    // ביטול השתבצות
+    sl.isMine=false;
+    sl.volunteers=sl.volunteers.filter(v=>v!==MY_NAME);
+    delete sl.volunteerHours; sl.volunteerHours = sl.volunteerHours || {};
+    delete sl.volunteerHours[MY_NAME];
     showToast('השתבצות בוטלה');
+    renderAll();
   } else {
-    sl.isMine=true;
-    if(!sl.volunteers.includes(MY_NAME)) sl.volunteers.unshift(MY_NAME);
-    showToast('✅ נרשמת למשמרת!','success');
+    // בדוק הגבלה (מנהל פטור)
+    if(!isAdmin && sl.volunteers.length >= SHIFT_MAX_VOLUNTEERS){
+      showToast(`⛔ המשמרת מלאה (${SHIFT_MAX_VOLUNTEERS} מתנדבים)`, 'error');
+      return;
+    }
+    // פתח modal לבחירת שעות
+    openHoursModal(date, type);
   }
-  renderAll();
 }
 
 // ============================================================
-// SLOT DETAIL MODAL (volunteer view)
+// HOURS SELECTION MODAL
 // ============================================================
-function openSlotModal(date,type){
-  const sl=getSlot(date,type);
-  const d=parseDate(date);
-  const count=sl.volunteers.length; const sc=slotStatus(count);
-  const statusColor=sc==='empty'?'#f87171':sc==='single'?'var(--gold-light)':'#4ade80';
-  const statusMsg=sc==='empty'?'⚠️ אין מתנדבים':sc==='single'?'⚠️ מתנדב אחד בלבד':'✅ כיסוי מספק';
-  document.getElementById('detail-title').textContent=`${SHIFT_LABELS[type]} | ${DAYS_HE[d.getDay()]} ${d.getDate()} ${MONTHS_HE[d.getMonth()]}`;
-  let body=`
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px">
-      <div style="background:rgba(255,255,255,.04);border-radius:10px;padding:14px;text-align:center">
-        <div style="font-size:32px;font-weight:700;color:${statusColor};line-height:1">${count}</div>
-        <div style="font-size:12px;color:var(--gray-300);margin-top:4px">מתנדב${count!==1?'ים':''} רשומ${count!==1?'ים':''}</div>
-        <div style="font-size:11px;color:${statusColor};margin-top:5px">${statusMsg}</div>
+function openHoursModal(date, type){
+  const d = parseDate(date);
+  const hours = SHIFT_HOURS[type];
+  const sl = getSlot(date, type);
+  const spotsLeft = isAdmin ? '∞' : `${SHIFT_MAX_VOLUNTEERS - sl.volunteers.length}`;
+
+  document.getElementById('detail-title').textContent =
+    `${SHIFT_LABELS[type]} | ${DAYS_HE[d.getDay()]} ${d.getDate()} ${MONTHS_HE[d.getMonth()]}`;
+
+  let body = `
+    <div style="background:rgba(255,255,255,.04);border-radius:10px;padding:12px 16px;margin-bottom:16px;font-size:13px">
+      <div style="color:var(--gray-300);margin-bottom:4px">⏰ חלון המשמרת: <strong>${SHIFT_TIMES[type]}</strong></div>
+      <div style="color:var(--gray-500);font-size:11px">בחר את השעות שבהן תוכל להתנדב בתוך חלון זה</div>
+    </div>
+
+    <div class="form-row" style="margin-bottom:16px">
+      <div class="form-group">
+        <label class="form-label">שעת התחלה</label>
+        <select class="form-select" id="hour-start" onchange="updateEndHours('${type}')">
+          ${hours.slice(0,-1).map(h=>`<option value="${h}">${h}</option>`).join('')}
+        </select>
       </div>
-      <div style="background:rgba(30,58,95,.3);border:1px solid rgba(59,130,246,.2);border-radius:10px;padding:14px;text-align:center">
-        <div style="font-size:32px;font-weight:700;color:#93c5fd;line-height:1">${sl.police?sl.police.length:0}</div>
-        <div style="font-size:12px;color:var(--gray-300);margin-top:4px">שוטרים סדירים</div>
-        <div style="font-size:11px;color:#93c5fd;margin-top:5px">👮 שיבוץ קבוע</div>
+      <div class="form-group">
+        <label class="form-label">שעת סיום</label>
+        <select class="form-select" id="hour-end">
+          ${hours.slice(1).map(h=>`<option value="${h}">${h}</option>`).join('')}
+        </select>
       </div>
     </div>`;
-  // Volunteers
-  body+=`<div class="form-label" style="margin-bottom:8px">מתנדבים רשומים:</div>`;
-  body+=`<div style="display:flex;flex-wrap:wrap;gap:5px;margin-bottom:14px;min-height:28px">`;
-  if(!count) body+=`<span style="font-size:12px;color:var(--gray-500);font-style:italic">אין מתנדבים רשומים</span>`;
-  else sl.volunteers.forEach(v=>{ body+=`<span class="vol-chip ${v===MY_NAME?'me':''}" style="font-size:12px;padding:4px 10px">${v===MY_NAME?'⭐ '+MY_NAME:v}</span>`; });
-  body+=`</div>`;
-  // Police
-  body+=`<div class="police-roster-box">`;
-  body+=`<h4>👮 שוטרים סדירים במשמרת זו</h4>`;
-  if(!sl.police || !sl.police.length){ body+=`<span style="font-size:12px;color:var(--gray-500);font-style:italic">לא הוזן שיבוץ שוטרים</span>`; }
-  else sl.police.forEach(p=>{ body+=`<span class="police-name-chip">👮 ${p}</span>`; });
-  body+=`</div>`;
-  if(sl.locked) body+=`<div style="margin-top:12px;font-size:12px;color:#f87171;display:flex;align-items:center;gap:6px">🔒 משמרת זו נעולה – לא ניתן לשנות שיבוץ</div>`;
-  body+=`<div style="font-size:11px;color:var(--gray-500);margin-top:12px;border-top:1px solid var(--card-border);padding-top:10px">השתבצות פתוחה ללא הגבלת מתנדבים</div>`;
-  document.getElementById('detail-body').innerHTML=body;
-  const acts=document.getElementById('detail-actions');
-  if(sl.locked && !isAdmin){
-    acts.innerHTML=`<button class="btn btn-ghost" onclick="closeModal('shift-detail')">סגור</button>`;
-  } else {
-    acts.innerHTML=sl.isMine
-      ? `<button class="btn btn-danger" onclick="toggleSlot('${date}','${type}');closeModal('shift-detail')">✕ ביטול השתבצות</button><button class="btn btn-ghost" onclick="closeModal('shift-detail')">סגור</button>`
-      : `<button class="btn btn-primary" onclick="toggleSlot('${date}','${type}');closeModal('shift-detail')">+ השתבץ למשמרת</button><button class="btn btn-ghost" onclick="closeModal('shift-detail')">סגור</button>`;
+
+  // מתנדבים קיימים
+  if(sl.volunteers.length > 0){
+    body += `<div class="form-label" style="margin-bottom:8px">מתנדבים רשומים:</div>
+    <div style="display:flex;flex-direction:column;gap:6px;margin-bottom:14px">`;
+    sl.volunteers.forEach(v=>{
+      const hrs = sl.volunteerHours?.[v] || '';
+      body += `<div style="display:flex;align-items:center;gap:8px;background:rgba(255,255,255,.04);border-radius:8px;padding:8px 12px">
+        <span class="vol-chip ${v===MY_NAME?'me':''}">${v===MY_NAME?'⭐ אני':v}</span>
+        ${hrs?`<span style="font-size:11px;color:var(--gray-500)">🕐 ${hrs}</span>`:''}
+      </div>`;
+    });
+    body += `</div>`;
   }
+
+  if(!isAdmin && sl.volunteers.length >= SHIFT_MAX_VOLUNTEERS){
+    body += `<div style="color:#f87171;font-size:12px;text-align:center;padding:10px">⛔ המשמרת מלאה</div>`;
+  }
+
+  // Police
+  if(sl.police && sl.police.length){
+    body += `<div class="police-roster-box"><h4>👮 שוטרים סדירים</h4>`;
+    sl.police.forEach(p=>{ body+=`<span class="police-name-chip">👮 ${p}</span>`; });
+    body += `</div>`;
+  }
+
+  document.getElementById('detail-body').innerHTML = body;
+
+  const canJoin = isAdmin || sl.volunteers.length < SHIFT_MAX_VOLUNTEERS;
+  document.getElementById('detail-actions').innerHTML = canJoin
+    ? `<button class="btn btn-primary" onclick="confirmHours('${date}','${type}')">✓ אשר השתבצות</button>
+       <button class="btn btn-ghost" onclick="closeModal('shift-detail')">ביטול</button>`
+    : `<button class="btn btn-ghost" onclick="closeModal('shift-detail')">סגור</button>`;
+
   document.getElementById('modal-shift-detail').classList.add('open');
+}
+
+function updateEndHours(type){
+  const startVal = document.getElementById('hour-start').value;
+  const hours = SHIFT_HOURS[type];
+  const startIdx = hours.indexOf(startVal);
+  const endSel = document.getElementById('hour-end');
+  endSel.innerHTML = hours.slice(startIdx+1).map(h=>`<option value="${h}">${h}</option>`).join('');
+}
+
+function confirmHours(date, type){
+  const start = document.getElementById('hour-start')?.value;
+  const end   = document.getElementById('hour-end')?.value;
+  if(!start || !end){ showToast('יש לבחור שעות','error'); return; }
+
+  const sl = ensureSlot(date, type);
+  if(!isAdmin && sl.volunteers.length >= SHIFT_MAX_VOLUNTEERS){
+    showToast(`⛔ המשמרת מלאה`,'error'); return;
+  }
+  sl.isMine = true;
+  if(!sl.volunteers.includes(MY_NAME)) sl.volunteers.unshift(MY_NAME);
+  if(!sl.volunteerHours) sl.volunteerHours = {};
+  sl.volunteerHours[MY_NAME] = `${start}–${end}`;
+  closeModal('shift-detail');
+  showToast(`✅ נרשמת לבוקר ${start}–${end}`,'success');
+  renderAll();
 }
 
 // ============================================================
@@ -1112,9 +1319,14 @@ function renderMine(filter='all'){
       if(sl.isMine) items.push({date,type,kind:'shift',volunteers:sl.volunteers,police:sl.police||[]});
     });
   });
-  // Add standby assignments
-  Object.entries(standbyRoster).forEach(([date,list])=>{
-    if(list.includes(MY_NAME)) items.push({date,type:'standby',kind:'standby'});
+  // Add standby-per-shift assignments
+  Object.entries(slots).forEach(([date,types])=>{
+    Object.entries(types).forEach(([type,sl])=>{
+      if(sl.isMineStandby) items.push({
+        date, type, kind:'standby-shift',
+        hours: sl.standbyHours?.[MY_NAME]||''
+      });
+    });
   });
   events.filter(e=>e.mine).forEach(e=>items.push({date:e.date,type:'event',kind:'event',name:e.name,location:e.location,time:e.time,id:e.id}));
   items.sort((a,b)=>a.date.localeCompare(b.date));
@@ -1122,8 +1334,7 @@ function renderMine(filter='all'){
   if(filter==='past') items=items.filter(s=>s.date<now);
   let html=items.map(item=>{
     const d=parseDate(item.date); const isPast=item.date<now; const isT=item.date===now;
-    if(item.kind==='standby'){
-      const list=getStandby(item.date); const others=list.filter(n=>n!==MY_NAME);
+    if(item.kind==='standby-shift'){
       return `<div class="my-shift-row">
         <div class="shift-type-bar" style="background:var(--standby)"></div>
         <div style="text-align:center;min-width:52px">
@@ -1132,11 +1343,11 @@ function renderMine(filter='all'){
           <div style="font-size:10px;color:var(--gray-500)">${DAYS_HE[d.getDay()]}</div>
         </div>
         <div class="my-shift-info">
-          <div class="my-shift-title" style="color:var(--standby-light)">🔴 כיתת כוננות</div>
-          <div class="my-shift-sub">${others.length?'עם: '+others.join(', '):'לבד ביחידה ביום זה'} · סה"כ ${list.length}/${STANDBY_MAX}</div>
+          <div class="my-shift-title" style="color:var(--standby-light)">🔴 כוננות — ${SHIFT_LABELS[item.type]}</div>
+          <div class="my-shift-sub">${item.hours?`🕐 ${item.hours}`:SHIFT_TIMES[item.type]}</div>
         </div>
         <span class="shift-status ${isPast?'status-confirmed':'status-pending'}">${isPast?'✓ בוצע':isT?'🔴 היום':'⏳ קרוב'}</span>
-        ${!isPast?`<button class="btn btn-danger btn-sm" onclick="toggleStandby('${item.date}');renderMine(document.querySelector('.form-select').value||'all')">ביטול</button>`:''}
+        ${!isPast?`<button class="btn btn-danger btn-sm" onclick="toggleStandbySlot('${item.date}','${item.type}');renderMine(document.querySelector('.form-select').value||'all')">ביטול</button>`:''}
       </div>`;
     }
     const otherVols=item.kind==='shift'?item.volunteers.filter(v=>v!==MY_NAME):[];
