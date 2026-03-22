@@ -626,6 +626,53 @@ header {
       <button class="btn btn-ghost btn-sm" style="margin-right:auto" onclick="exitAdmin()">← יציאה מניהול</button>
     </div>
 
+    <!-- Volunteer Management -->
+    <div class="admin-card" style="margin-bottom:16px;border-color:rgba(37,99,235,.3)">
+      <h3 style="color:#93c5fd">👥 ניהול מתנדבים</h3>
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">שם פרטי *</label>
+          <input type="text" class="form-input" id="vol-first-name" placeholder="ישראל">
+        </div>
+        <div class="form-group">
+          <label class="form-label">שם משפחה *</label>
+          <input type="text" class="form-input" id="vol-last-name" placeholder="ישראלי">
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">מספר נייד *</label>
+          <input type="tel" class="form-input" id="vol-phone" placeholder="050-0000000">
+        </div>
+        <div class="form-group">
+          <label class="form-label">תעודת זהות *</label>
+          <input type="text" class="form-input" id="vol-id" placeholder="000000000" maxlength="9">
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">מספר אישי (לא חובה)</label>
+          <input type="text" class="form-input" id="vol-personal-num" placeholder="מספר אישי">
+        </div>
+        <div class="form-group">
+          <label class="form-label">קוד גישה אישי (4 ספרות) *</label>
+          <input type="text" class="form-input" id="vol-access-code" placeholder="1234" maxlength="4" pattern="[0-9]{4}">
+        </div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">סטטוס</label>
+        <select class="form-select" id="vol-status">
+          <option value="active">פעיל ✅</option>
+          <option value="inactive">לא פעיל ❌</option>
+        </select>
+      </div>
+      <div style="display:flex;gap:8px;margin-bottom:16px">
+        <button class="btn btn-primary" onclick="addVolunteerToList()">+ הוסף מתנדב</button>
+        <button class="btn btn-ghost btn-sm" onclick="generateAccessCode()">🎲 צור קוד אוטומטי</button>
+      </div>
+      <div id="vol-mgmt-list"></div>
+    </div>
+
     <div class="section-header">
       <div class="section-title admin-title">ניהול משמרות – תצוגה שבועית</div>
       <div class="flex-gap">
@@ -796,6 +843,23 @@ header {
   </div>
 </div>
 
+<!-- VOLUNTEER LOGIN SCREEN -->
+<div class="pw-screen" id="vol-login-screen" style="display:none">
+  <div class="pw-box" style="border-color:rgba(37,99,235,.4)">
+    <div style="font-size:42px;margin-bottom:12px">🛡️</div>
+    <h2 style="color:#93c5fd">מתנדבי גבעתיים</h2>
+    <p>הזן את קוד הגישה האישי שלך</p>
+    <input type="tel" class="form-input" id="vol-code-input" placeholder="קוד אישי (4 ספרות)"
+      maxlength="4" pattern="[0-9]*" inputmode="numeric"
+      style="margin-bottom:12px;text-align:center;font-size:22px;letter-spacing:10px;font-weight:700"
+      onkeydown="if(event.key==='Enter')checkVolunteerCode()">
+    <button class="btn btn-primary" style="width:100%;margin-bottom:10px;padding:12px" onclick="checkVolunteerCode()">כניסה</button>
+    <div id="vol-login-error" style="color:#f87171;font-size:12px;margin-bottom:10px;display:none">⛔ קוד שגוי — פנה לקצין המתנדבים</div>
+    <button class="btn btn-ghost btn-sm" style="width:100%" onclick="enterAsViewer()">👁️ כניסה כצופה בלבד</button>
+    <div style="margin-top:14px;font-size:11px;color:var(--gray-500)">הקוד מועבר אליך על ידי קצין המתנדבים</div>
+  </div>
+</div>
+
 <!-- ADMIN PASSWORD SCREEN -->
 <div class="pw-screen" id="pw-screen" style="display:none">
   <div class="pw-box">
@@ -836,8 +900,54 @@ const ADMIN_PASSWORD = (()=>{
   return _k.map(c=>String.fromCharCode(c^42)).join('');
 })();
 
-const MY_NAME = 'אתה'; // שם המתנדב המחובר (ב-MVP)
+// ============================================================
+// VOLUNTEER REGISTRY
+// ============================================================
+/*
+  volunteers = [{
+    firstName, lastName, phone, id, personalNum, accessCode, status, addedDate
+  }]
+*/
+let volunteers = [
+  { firstName:'ישראל', lastName:'ישראלי', phone:'050-0000001', id:'000000001', personalNum:'', accessCode:'1111', status:'active', addedDate:'2026-01-01' },
+  { firstName:'שרה', lastName:'כהן', phone:'052-0000002', id:'000000002', personalNum:'V-042', accessCode:'2222', status:'active', addedDate:'2026-01-01' },
+];
+
+let currentVolunteer = null; // המתנדב המחובר כרגע
+let MY_NAME = 'אתה'; // יתעדכן אחרי כניסה
 let isAdmin = false;
+let isLoggedIn = false;
+
+// ============================================================
+// VOLUNTEER LOGIN
+// ============================================================
+function checkVolunteerCode(){
+  const code = document.getElementById('vol-code-input').value.trim();
+  const vol = volunteers.find(v => v.accessCode === code && v.status === 'active');
+  if(vol){
+    currentVolunteer = vol;
+    MY_NAME = `${vol.firstName} ${vol.lastName}`;
+    isLoggedIn = true;
+    document.getElementById('vol-login-screen').style.display = 'none';
+    document.getElementById('user-name-display').textContent = MY_NAME;
+    showToast(`✅ ברוך הבא, ${vol.firstName}!`, 'success');
+    renderAll();
+  } else {
+    document.getElementById('vol-login-error').style.display = 'block';
+    document.getElementById('vol-code-input').value = '';
+    document.getElementById('vol-code-input').focus();
+  }
+}
+
+function enterAsViewer(){
+  // כניסה כצופה — רק צפייה ללא השתבצות
+  currentVolunteer = null;
+  MY_NAME = 'צופה';
+  isLoggedIn = true;
+  document.getElementById('vol-login-screen').style.display = 'none';
+  document.getElementById('user-name-display').textContent = 'צופה בלבד';
+  renderAll();
+}
 
 const today = new Date();
 let currentWeekStart = getWeekStart(today);
@@ -928,8 +1038,136 @@ function slotStatus(count){ return count===0?'empty':count<SHIFT_MAX_VOLUNTEERS?
 })();
 
 // ============================================================
-// ADMIN AUTH
+// VOLUNTEER REGISTRY (רשימה לבנה)
 // ============================================================
+// volunteerRegistry: [{ name, code, active }]
+let volunteerRegistry = [
+  { name: 'צבי בר', code: '1976', active: true },
+];
+
+// מצב המשתמש הנוכחי
+let currentUser = null; // null = צופה, { name, code } = מתנדב מאושר
+
+function initVolunteerLogin(){
+  // בדוק אם כבר מחובר (sessionStorage)
+  const saved = sessionStorage.getItem('vol_user');
+  if(saved){
+    try {
+      currentUser = JSON.parse(saved);
+      updateUserDisplay();
+      return;
+    } catch(e){}
+  }
+  // הצג מסך כניסה
+  document.getElementById('vol-login-screen').style.display='flex';
+  setTimeout(()=>document.getElementById('vol-code-input').focus(),300);
+}
+
+function checkVolCode(){
+  const code = document.getElementById('vol-code-input').value.trim();
+  const vol = volunteerRegistry.find(v=>v.code===code && v.active);
+  if(vol){
+    currentUser = { name: vol.name, code: vol.code };
+    sessionStorage.setItem('vol_user', JSON.stringify(currentUser));
+    document.getElementById('vol-login-screen').style.display='none';
+    updateUserDisplay();
+    showToast(`✅ ברוך הבא, ${vol.name}!`, 'success');
+    renderAll();
+  } else {
+    document.getElementById('vol-code-error').style.display='block';
+    document.getElementById('vol-code-input').value='';
+    document.getElementById('vol-code-input').focus();
+  }
+}
+
+function enterAsViewer(){
+  currentUser = null;
+  document.getElementById('vol-login-screen').style.display='none';
+  updateUserDisplay();
+  showToast('כניסה כצופה — שיבוץ לא זמין');
+}
+
+function updateUserDisplay(){
+  const badge = document.getElementById('user-badge');
+  const nameEl = document.getElementById('user-name-display');
+  const dot = document.getElementById('role-dot');
+  if(isAdmin){
+    badge.classList.add('admin');
+    dot.className='role-dot admin';
+    nameEl.textContent='מנהל';
+  } else if(currentUser){
+    badge.classList.remove('admin');
+    dot.className='role-dot volunteer';
+    nameEl.textContent=currentUser.name;
+    // עדכן MY_NAME לשם האמיתי
+    window.MY_NAME_DISPLAY = currentUser.name;
+  } else {
+    badge.classList.remove('admin');
+    dot.className='role-dot';
+    dot.style.background='var(--gray-500)';
+    nameEl.textContent='צופה';
+  }
+}
+
+function canEdit(){
+  return isAdmin || currentUser !== null;
+}
+
+// ניהול מתנדבים (ממשק מנהל)
+function addVolunteerToList(){
+  const name = document.getElementById('vol-mgmt-name').value.trim();
+  const code = document.getElementById('vol-mgmt-code').value.trim();
+  if(!name || code.length !== 4 || !/^\d{4}$/.test(code)){
+    showToast('יש למלא שם וקוד של 4 ספרות', 'error'); return;
+  }
+  if(volunteerRegistry.find(v=>v.code===code)){
+    showToast('קוד זה כבר קיים — בחר קוד אחר', 'error'); return;
+  }
+  volunteerRegistry.push({ name, code, active: true });
+  document.getElementById('vol-mgmt-name').value='';
+  document.getElementById('vol-mgmt-code').value='';
+  showToast(`✅ ${name} נוסף למערכת`, 'success');
+  renderVolMgmtList();
+}
+
+function toggleVolActive(code){
+  const vol = volunteerRegistry.find(v=>v.code===code);
+  if(!vol) return;
+  vol.active = !vol.active;
+  showToast(`${vol.name} — ${vol.active?'הופעל':'הושבת'}`, 'success');
+  renderVolMgmtList();
+}
+
+function removeVol(code){
+  const vol = volunteerRegistry.find(v=>v.code===code);
+  if(!vol || !confirm(`למחוק את ${vol.name} מהמערכת?`)) return;
+  volunteerRegistry = volunteerRegistry.filter(v=>v.code!==code);
+  showToast(`${vol.name} הוסר`, 'success');
+  renderVolMgmtList();
+}
+
+function renderVolMgmtList(){
+  const el = document.getElementById('vol-mgmt-list');
+  if(!el) return;
+  if(!volunteerRegistry.length){
+    el.innerHTML='<p style="font-size:12px;color:var(--gray-500)">אין מתנדבים רשומים</p>';
+    return;
+  }
+  let html=`<table class="volunteer-table"><thead><tr><th>שם</th><th>קוד</th><th>סטטוס</th><th>פעולות</th></tr></thead><tbody>`;
+  volunteerRegistry.forEach(v=>{
+    html+=`<tr>
+      <td>${v.name}</td>
+      <td style="font-family:monospace;letter-spacing:3px">${v.code}</td>
+      <td><span class="${v.active?'open-badge':'locked-badge'}">${v.active?'פעיל':'מושבת'}</span></td>
+      <td style="display:flex;gap:6px;padding:6px 10px">
+        <button class="btn btn-ghost btn-sm" onclick="toggleVolActive('${v.code}')">${v.active?'השבת':'הפעל'}</button>
+        <button class="btn btn-danger btn-sm" onclick="removeVol('${v.code}')">🗑️</button>
+      </td>
+    </tr>`;
+  });
+  html+=`</tbody></table>`;
+  el.innerHTML=html;
+}
 function promptAdminLogin(){
   if(isAdmin){ exitAdmin(); return; }
   document.getElementById('admin-pw-input').value='';
@@ -965,6 +1203,7 @@ function exitAdmin(){
   document.getElementById('role-dot').className='role-dot volunteer';
   document.getElementById('user-name-display').textContent='מתנדב';
   showToast('יצאת ממצב מנהל');
+  updateUserDisplay();
   switchTab('week', document.querySelector('.tab-btn'));
   renderAll();
 }
@@ -1190,6 +1429,7 @@ function renderWeek(){
 // STANDBY SLOT TOGGLE (per shift)
 // ============================================================
 function toggleStandbySlot(date, type){
+  if(!canEdit()){ showToast('⛔ יש להתחבר כדי להשתבץ','error'); return; }
   const sl = ensureSlot(date, type);
   if(sl.locked && !isAdmin){ showToast('⛔ משמרת נעולה','error'); return; }
   if(sl.isMineStandby){
@@ -1280,6 +1520,7 @@ function confirmStandbyHours(date, type){
   renderAll();
 }
 function toggleSlot(date,type){
+  if(!canEdit()){ showToast('⛔ יש להתחבר כדי להשתבץ','error'); return; }
   const sl=ensureSlot(date,type);
   if(sl.locked && !isAdmin){ showToast('⛔ משמרת זו נעולה על ידי המנהל','error'); return; }
   if(sl.isMine){
@@ -1587,6 +1828,7 @@ function renderMine(filter='all'){
 // ============================================================
 function changeAdminWeek(dir){ adminWeekStart=addDays(adminWeekStart,dir*7); renderAdmin(); }
 function renderAdmin(){
+  renderVolMgmtList();
   renderAdminWeekGrid();
   renderAdminVolunteersTable();
   renderAdminLocks();
@@ -2079,6 +2321,112 @@ function renderStats(){
 }
 
 // ============================================================
+// VOLUNTEER MANAGEMENT (Admin)
+// ============================================================
+function generateAccessCode(){
+  const code = String(Math.floor(1000 + Math.random() * 9000));
+  document.getElementById('vol-access-code').value = code;
+  showToast(`קוד נוצר: ${code}`);
+}
+
+function addVolunteerToList(){
+  const firstName = document.getElementById('vol-first-name').value.trim();
+  const lastName  = document.getElementById('vol-last-name').value.trim();
+  const phone     = document.getElementById('vol-phone').value.trim();
+  const id        = document.getElementById('vol-id').value.trim();
+  const personalNum = document.getElementById('vol-personal-num').value.trim();
+  const accessCode  = document.getElementById('vol-access-code').value.trim();
+  const status      = document.getElementById('vol-status').value;
+
+  if(!firstName||!lastName||!phone||!id||!accessCode){
+    showToast('יש למלא שם פרטי, שם משפחה, נייד, ת.ז וקוד גישה','error'); return;
+  }
+  if(accessCode.length !== 4 || !/^\d+$/.test(accessCode)){
+    showToast('קוד גישה חייב להיות 4 ספרות','error'); return;
+  }
+  if(volunteers.find(v=>v.accessCode===accessCode)){
+    showToast('קוד גישה כבר קיים — בחר קוד אחר','error'); return;
+  }
+  if(volunteers.find(v=>v.id===id)){
+    showToast('תעודת זהות כבר קיימת במערכת','error'); return;
+  }
+
+  volunteers.push({
+    firstName, lastName, phone, id, personalNum, accessCode, status,
+    addedDate: formatDate(today)
+  });
+
+  // נקה שדות
+  ['vol-first-name','vol-last-name','vol-phone','vol-id','vol-personal-num','vol-access-code'].forEach(id=>{
+    document.getElementById(id).value='';
+  });
+
+  showToast(`✅ ${firstName} ${lastName} נוסף למערכת`,'success');
+  renderVolMgmtList();
+}
+
+function renderVolMgmtList(){
+  if(!volunteers.length){
+    document.getElementById('vol-mgmt-list').innerHTML='<p style="font-size:12px;color:var(--gray-500)">אין מתנדבים רשומים</p>';
+    return;
+  }
+  let html=`
+    <div style="overflow-x:auto;margin-top:8px">
+    <table class="volunteer-table" style="font-size:12px">
+      <thead>
+        <tr>
+          <th>שם פרטי</th><th>שם משפחה</th><th>נייד</th>
+          <th>ת.ז</th><th>מספר אישי</th><th>קוד גישה</th>
+          <th>סטטוס</th><th>פעולות</th>
+        </tr>
+      </thead>
+      <tbody>`;
+  volunteers.forEach((v,i)=>{
+    html+=`<tr>
+      <td>${v.firstName}</td>
+      <td>${v.lastName}</td>
+      <td style="direction:ltr">${v.phone}</td>
+      <td>${v.id}</td>
+      <td>${v.personalNum||'—'}</td>
+      <td><span style="background:rgba(37,99,235,.2);color:#93c5fd;padding:2px 8px;border-radius:6px;font-weight:700;letter-spacing:2px">${v.accessCode}</span></td>
+      <td><span class="${v.status==='active'?'open-badge':'locked-badge'}">${v.status==='active'?'פעיל':'לא פעיל'}</span></td>
+      <td style="display:flex;gap:4px">
+        <button class="btn btn-sm btn-ghost" onclick="toggleVolStatus(${i})">${v.status==='active'?'השבת':'הפעל'}</button>
+        <button class="btn btn-sm btn-danger" onclick="removeVolunteer(${i})">מחק</button>
+      </td>
+    </tr>`;
+  });
+  html+=`</tbody></table></div>`;
+  document.getElementById('vol-mgmt-list').innerHTML=html;
+}
+
+function toggleVolStatus(idx){
+  volunteers[idx].status = volunteers[idx].status==='active'?'inactive':'active';
+  showToast(`סטטוס עודכן`,'success');
+  renderVolMgmtList();
+}
+
+function removeVolunteer(idx){
+  const v = volunteers[idx];
+  if(!confirm(`למחוק את ${v.firstName} ${v.lastName} מהמערכת?`)) return;
+  volunteers.splice(idx,1);
+  showToast('המתנדב הוסר','success');
+  renderVolMgmtList();
+}
+
+// ============================================================
+// INIT VOLUNTEER LOGIN
+// ============================================================
+function initVolunteerLogin(){
+  // הצג מסך כניסה בפתיחה
+  const screen = document.getElementById('vol-login-screen');
+  if(screen) {
+    screen.style.display='flex';
+    setTimeout(()=>document.getElementById('vol-code-input')?.focus(),300);
+  }
+}
+
+// ============================================================
 // MODAL
 // ============================================================
 function openModal(name){
@@ -2102,6 +2450,7 @@ function showToast(msg,type=''){
 // ============================================================
 // INIT
 // ============================================================
+initVolunteerLogin();
 renderStats(); renderWeek(); renderDailyView(); renderMonth(); renderEvents(); renderMine();
 </script>
 </body>
