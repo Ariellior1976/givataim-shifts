@@ -2560,9 +2560,20 @@ function showToast(msg,type=''){
 // INIT WITH FIREBASE
 // ============================================================
 function initApp(){
-  initVolunteerLogin();
-  // Firebase listener יופעל רק אחרי כניסה — ראה startFirebaseSync()
-  renderStats(); renderWeek(); renderDailyView(); renderMonth(); renderEvents(); renderMine();
+  // טען מתנדבים מ-Firebase לפני הצגת מסך הכניסה
+  db.ref('volunteers').once('value').then(snap => {
+    const data = snap.val();
+    if(data) {
+      const vals = Array.isArray(data) ? data : Object.values(data);
+      volunteers = vals.filter(Boolean);
+    }
+    initVolunteerLogin();
+    renderStats(); renderWeek(); renderDailyView(); renderMonth(); renderEvents(); renderMine();
+  }).catch(() => {
+    // אם Firebase לא זמין — הצג מסך כניסה בכל מקרה
+    initVolunteerLogin();
+    renderStats(); renderWeek(); renderDailyView(); renderMonth(); renderEvents(); renderMine();
+  });
 }
 
 // מופעל אחרי כניסה מוצלחת
