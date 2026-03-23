@@ -956,9 +956,7 @@ let isLoggedIn = false;
 // ============================================================
 function checkVolunteerCode(){
   const code = document.getElementById('vol-code-input').value.trim();
-  const encryptedInput = encryptData(code);
-  // השווה קוד מוצפן לקוד מוצפן שב-Firebase
-  const vol = volunteers.find(v => v.accessCode === encryptedInput && v.status === 'active');
+  const vol = volunteers.find(v => v.accessCode === code && v.status === 'active');
   if(vol){
     currentVolunteer = vol;
     MY_NAME = `${vol.firstName} ${vol.lastName}`;
@@ -2411,9 +2409,9 @@ function decryptData(encoded){
 
 function encryptVolunteer(vol){
   return {
-    firstName: vol.firstName,   // שם פרטי — גלוי (מוצג בלוח)
-    lastName: vol.lastName,     // שם משפחה — גלוי (מוצג בלוח)
-    accessCode: encryptData(vol.accessCode), // קוד גישה — מוצפן
+    firstName: vol.firstName,
+    lastName: vol.lastName,
+    accessCode: vol.accessCode, // קוד גישה — לא מוצפן (נדרש להשוואה)
     status: vol.status,
     addedDate: vol.addedDate,
     // נתונים רגישים — מוצפנים
@@ -2426,7 +2424,7 @@ function encryptVolunteer(vol){
 function decryptVolunteer(vol){
   return {
     ...vol,
-    accessCode: decryptData(vol.accessCode),
+    accessCode: vol.accessCode, // כבר טקסט רגיל
     phone: decryptData(vol._phone || ''),
     id: decryptData(vol._id || ''),
     personalNum: decryptData(vol._personalNum || ''),
