@@ -1486,6 +1486,7 @@ function toggleStandbySlot(date, type){
     sl.standby = sl.standby.filter(v=>v!==MY_NAME);
     delete sl.standbyHours[MY_NAME];
     showToast('הסרת עצמך מכוננות');
+    saveSlots();
     renderAll();
   } else {
     if(!isAdmin && (sl.standby||[]).length >= SHIFT_MAX_VOLUNTEERS){
@@ -1566,6 +1567,7 @@ function confirmStandbyHours(date, type){
   sl.standbyHours[MY_NAME] = `${start}–${end}`;
   closeModal('shift-detail');
   showToast('✅ נרשמת לכוננות!','success');
+  saveSlots();
   renderAll();
 }
 function toggleSlot(date,type){
@@ -1579,6 +1581,7 @@ function toggleSlot(date,type){
     delete sl.volunteerHours; sl.volunteerHours = sl.volunteerHours || {};
     delete sl.volunteerHours[MY_NAME];
     showToast('השתבצות בוטלה');
+    saveSlots();
     renderAll();
   } else {
     // בדוק הגבלה (מנהל פטור)
@@ -1683,6 +1686,7 @@ function confirmHours(date, type){
   sl.volunteerHours[MY_NAME] = `${start}–${end}`;
   closeModal('shift-detail');
   showToast(`✅ נרשמת לבוקר ${start}–${end}`,'success');
+  saveSlots();
   renderAll();
 }
 
@@ -2541,13 +2545,6 @@ function initApp(){
 // שמור slots ל-Firebase בכל שינוי
 function saveSlots(){
   saveToFirebase('slots', slots).catch(e => console.warn('Firebase save error:', e));
-}
-
-// עדכן toggleSlot ו-toggleStandbySlot לשמור אחרי כל שינוי
-const _origToggleSlot = toggleSlot;
-function toggleSlot(date, type){
-  _origToggleSlot(date, type);
-  saveSlots();
 }
 
 initApp();
