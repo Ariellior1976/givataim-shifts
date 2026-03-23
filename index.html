@@ -956,7 +956,9 @@ let isLoggedIn = false;
 // ============================================================
 function checkVolunteerCode(){
   const code = document.getElementById('vol-code-input').value.trim();
-  const vol = volunteers.map(decryptVolunteer).find(v => v.accessCode === code && v.status === 'active');
+  const encryptedInput = encryptData(code);
+  // השווה קוד מוצפן לקוד מוצפן שב-Firebase
+  const vol = volunteers.find(v => v.accessCode === encryptedInput && v.status === 'active');
   if(vol){
     currentVolunteer = vol;
     MY_NAME = `${vol.firstName} ${vol.lastName}`;
