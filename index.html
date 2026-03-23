@@ -2049,6 +2049,10 @@ function ensureStandby(date){ if(!standbyRoster[date]) standbyRoster[date]=[]; r
 
 function isInStandby(date){ return getStandby(date).includes(MY_NAME); }
 
+function saveStandby(){
+  saveToFirebase('standbyRoster', standbyRoster).catch(e => console.warn('Firebase standby save error:', e));
+}
+
 function toggleStandby(date){
   const list = ensureStandby(date);
   if(list.includes(MY_NAME)){
@@ -2059,6 +2063,7 @@ function toggleStandby(date){
     standbyRoster[date] = [MY_NAME, ...list];
     showToast('✅ נרשמת לכיתת כוננות!', 'success');
   }
+  saveStandby();
   renderAll();
 }
 
@@ -2540,6 +2545,14 @@ function startFirebaseSync(){
         });
       });
     }
+    renderAll();
+  });
+
+  listenToFirebase('standbyRoster', data => {
+    if(!data) return;
+    Object.entries(data).forEach(([date, val]) => {
+      standbyRoster[date] = Array.isArray(val) ? val : Object.values(val);
+    });
     renderAll();
   });
 
