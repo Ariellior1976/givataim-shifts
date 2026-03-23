@@ -964,6 +964,7 @@ function checkVolunteerCode(){
     document.getElementById('vol-login-screen').style.display = 'none';
     document.getElementById('user-name-display').textContent = MY_NAME;
     showToast(`✅ ברוך הבא, ${vol.firstName}!`, 'success');
+    startFirebaseSync();
     renderAll();
   } else {
     document.getElementById('vol-login-error').style.display = 'block';
@@ -979,6 +980,7 @@ function enterAsViewer(){
   isLoggedIn = true;
   document.getElementById('vol-login-screen').style.display = 'none';
   document.getElementById('user-name-display').textContent = 'צופה בלבד';
+  startFirebaseSync();
   renderAll();
 }
 
@@ -1143,7 +1145,7 @@ function updateUserDisplay(){
 }
 
 function canEdit(){
-  return isAdmin || currentUser !== null;
+  return isAdmin || (isLoggedIn && MY_NAME !== 'צופה');
 }
 
 // ניהול מתנדבים (ממשק מנהל)
@@ -1230,6 +1232,7 @@ function checkAdminPw(){
     MY_NAME='מנהל';
     document.getElementById('pw-screen').style.display='none';
     document.getElementById('vol-login-screen').style.display='none';
+    startFirebaseSync();
     document.getElementById('admin-tab').style.display='flex';
     document.getElementById('admin-toggle-btn').textContent='🔓 יציאת מנהל';
     document.getElementById('btn-add-event').style.display='flex';
@@ -2506,21 +2509,33 @@ function showToast(msg,type=''){
 // ============================================================
 function initApp(){
   initVolunteerLogin();
+  // Firebase listener יופעל רק אחרי כניסה — ראה startFirebaseSync()
+  renderStats(); renderWeek(); renderDailyView(); renderMonth(); renderEvents(); renderMine();
+}
 
-  // האזן לשינויים בזמן אמת מ-Firebase
+// מופעל אחרי כניסה מוצלחת
+function startFirebaseSync(){
+  // האזן לשינויים בזמן אמת
   listenToFirebase('slots', data => {
-    if(data) {
-      // מיזג — שמור isMine ו-isMineStandby של המשתמש הנוכחי
+    if(data && typeof data === 'object') {
       Object.entries(data).forEach(([date, types]) => {
+        if(!types || typeof types !== 'object') return;
         Object.entries(types).forEach(([type, sl]) => {
+          if(!sl || typeof sl !== 'object') return;
           if(!slots[date]) slots[date] = {};
-          const existingSlot = slots[date][type] || {};
+          const vols = sl.volunteers ? Object.values(sl.volunteers) : [];
+          const sb   = sl.standby   ? Object.values(sl.standby)   : [];
+          const volHours = sl.volunteerHours || {};
+          const sbHours  = sl.standbyHours   || {};
           slots[date][type] = {
-            ...sl,
-            isMine: sl.volunteers && Array.isArray(sl.volunteers) ? sl.volunteers.includes(MY_NAME) : false,
-            isMineStandby: sl.standby && Array.isArray(sl.standby) ? sl.standby.includes(MY_NAME) : false,
-            volunteerHours: sl.volunteerHours || {},
-            standbyHours: sl.standbyHours || {},
+            volunteers: vols,
+            standby: sb,
+            police: sl.police ? Object.values(sl.police) : [],
+            locked: sl.locked || false,
+            isMine: MY_NAME !== 'צופה' && vols.includes(MY_NAME),
+            isMineStandby: MY_NAME !== 'צופה' && sb.includes(MY_NAME),
+            volunteerHours: volHours,
+            standbyHours: sbHours,
           };
         });
       });
@@ -2529,22 +2544,37 @@ function initApp(){
   });
 
   listenToFirebase('volunteers', data => {
-    if(data && Array.isArray(data)) volunteers = data;
-    else if(data && typeof data === 'object') volunteers = Object.values(data);
+    if(!data) return;
+    const vals = Array.isArray(data) ? data : Object.values(data);
+    volunteers = vals.filter(Boolean);
   });
 
   listenToFirebase('events', data => {
-    if(data && Array.isArray(data)) events = data;
-    else if(data && typeof data === 'object') events = Object.values(data);
+    if(!data) return;
+    const vals = Array.isArray(data) ? data : Object.values(data);
+    events = vals.filter(Boolean);
     renderEvents();
   });
-
-  renderStats(); renderWeek(); renderDailyView(); renderMonth(); renderEvents(); renderMine();
 }
 
 // שמור slots ל-Firebase בכל שינוי
 function saveSlots(){
-  saveToFirebase('slots', slots).catch(e => console.warn('Firebase save error:', e));
+  // המר arrays לאובייקטים לפני שמירה (Firebase לא אוהב arrays עם holes)
+  const toSave = {};
+  Object.entries(slots).forEach(([date, types]) => {
+    toSave[date] = {};
+    Object.entries(types).forEach(([type, sl]) => {
+      toSave[date][type] = {
+        volunteers: sl.volunteers || [],
+        standby: sl.standby || [],
+        police: sl.police || [],
+        locked: sl.locked || false,
+        volunteerHours: sl.volunteerHours || {},
+        standbyHours: sl.standbyHours || {},
+      };
+    });
+  });
+  saveToFirebase('slots', toSave).catch(e => console.warn('Firebase save error:', e));
 }
 
 initApp();
