@@ -13,6 +13,9 @@
 <title>מערכת השתבצות משמרות | תחנת גבעתיים</title>
 <link rel="manifest" href="manifest.json">
 <link href="https://fonts.googleapis.com/css2?family=Heebo:wght@300;400;500;600;700;900&display=swap" rel="stylesheet">
+<!-- Firebase SDK -->
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-database-compat.js"></script>
 <style>
 :root {
   --blue-deep: #0a1628; --blue-mid: #0d2240; --blue-accent: #1a4a8a;
@@ -880,6 +883,34 @@ header {
 <div class="toast" id="toast"><span id="toast-msg"></span></div>
 
 <script>
+// ============================================================
+// FIREBASE CONFIGURATION
+// ============================================================
+const firebaseConfig = {
+  apiKey: "AIzaSyDxnRM8tKFTT-7oMKdYT1b5XuBvH0eZn1g",
+  authDomain: "givataim-shifts.firebaseapp.com",
+  databaseURL: "https://givataim-shifts-default-rtdb.europe-west1.firebasedatabase.app",
+  projectId: "givataim-shifts",
+  storageBucket: "givataim-shifts.firebasestorage.app",
+  messagingSenderId: "876561730960",
+  appId: "1:876561730960:web:563ff8a9fc2c9a9ecd3715"
+};
+firebase.initializeApp(firebaseConfig);
+const db = firebase.database();
+
+// ============================================================
+// FIREBASE HELPERS — שמירה וטעינה
+// ============================================================
+function saveToFirebase(path, data){
+  return db.ref(path).set(data);
+}
+function pushToFirebase(path, data){
+  return db.ref(path).push(data);
+}
+function listenToFirebase(path, callback){
+  db.ref(path).on('value', snap => callback(snap.val()));
+}
+
 // ============================================================
 // CONSTANTS & STATE
 // ============================================================
@@ -2380,6 +2411,7 @@ function addVolunteerToList(){
   });
 
   showToast(`✅ ${firstName} ${lastName} נוסף למערכת`,'success');
+  saveToFirebase('volunteers', volunteers);
   renderVolMgmtList();
 }
 
@@ -2466,10 +2498,60 @@ function showToast(msg,type=''){
 }
 
 // ============================================================
-// INIT
+// INIT WITH FIREBASE
 // ============================================================
-initVolunteerLogin();
-renderStats(); renderWeek(); renderDailyView(); renderMonth(); renderEvents(); renderMine();
+function initApp(){
+  initVolunteerLogin();
+
+  // האזן לשינויים בזמן אמת מ-Firebase
+  listenToFirebase('slots', data => {
+    if(data) {
+      // מיזג — שמור isMine ו-isMineStandby של המשתמש הנוכחי
+      Object.entries(data).forEach(([date, types]) => {
+        Object.entries(types).forEach(([type, sl]) => {
+          if(!slots[date]) slots[date] = {};
+          const existingSlot = slots[date][type] || {};
+          slots[date][type] = {
+            ...sl,
+            isMine: sl.volunteers && Array.isArray(sl.volunteers) ? sl.volunteers.includes(MY_NAME) : false,
+            isMineStandby: sl.standby && Array.isArray(sl.standby) ? sl.standby.includes(MY_NAME) : false,
+            volunteerHours: sl.volunteerHours || {},
+            standbyHours: sl.standbyHours || {},
+          };
+        });
+      });
+    }
+    renderAll();
+  });
+
+  listenToFirebase('volunteers', data => {
+    if(data && Array.isArray(data)) volunteers = data;
+    else if(data && typeof data === 'object') volunteers = Object.values(data);
+  });
+
+  listenToFirebase('events', data => {
+    if(data && Array.isArray(data)) events = data;
+    else if(data && typeof data === 'object') events = Object.values(data);
+    renderEvents();
+  });
+
+  renderStats(); renderWeek(); renderDailyView(); renderMonth(); renderEvents(); renderMine();
+}
+
+// שמור slots ל-Firebase בכל שינוי
+function saveSlots(){
+  saveToFirebase('slots', slots).catch(e => console.warn('Firebase save error:', e));
+}
+
+// עדכן toggleSlot ו-toggleStandbySlot לשמור אחרי כל שינוי
+const _origToggleSlot = toggleSlot;
+function toggleSlot(date, type){
+  _origToggleSlot(date, type);
+  saveSlots();
+}
+
+initApp();
+
 </script>
 </body>
 </html>
