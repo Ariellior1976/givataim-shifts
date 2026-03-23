@@ -956,7 +956,7 @@ let isLoggedIn = false;
 // ============================================================
 function checkVolunteerCode(){
   const code = document.getElementById('vol-code-input').value.trim();
-  const vol = volunteers.find(v => v.accessCode === code && v.status === 'active');
+  const vol = volunteers.map(decryptVolunteer).find(v => v.accessCode === code && v.status === 'active');
   if(vol){
     currentVolunteer = vol;
     MY_NAME = `${vol.firstName} ${vol.lastName}`;
@@ -2382,8 +2382,55 @@ function renderStats(){
 }
 
 // ============================================================
-// VOLUNTEER MANAGEMENT (Admin)
+// VOLUNTEER MANAGEMENT (Admin) + ENCRYPTION
 // ============================================================
+
+// הצפנה פשוטה עם XOR + Base64 — מפתח = סיסמת מנהל
+function encryptData(text){
+  const key = ADMIN_PASSWORD;
+  let result = '';
+  for(let i=0; i<text.length; i++){
+    result += String.fromCharCode(text.charCodeAt(i) ^ key.charCodeAt(i % key.length));
+  }
+  return btoa(unescape(encodeURIComponent(result)));
+}
+
+function decryptData(encoded){
+  try {
+    const text = decodeURIComponent(escape(atob(encoded)));
+    const key = ADMIN_PASSWORD;
+    let result = '';
+    for(let i=0; i<text.length; i++){
+      result += String.fromCharCode(text.charCodeAt(i) ^ key.charCodeAt(i % key.length));
+    }
+    return result;
+  } catch(e) { return '***'; }
+}
+
+function encryptVolunteer(vol){
+  return {
+    firstName: vol.firstName,   // שם פרטי — גלוי (מוצג בלוח)
+    lastName: vol.lastName,     // שם משפחה — גלוי (מוצג בלוח)
+    accessCode: encryptData(vol.accessCode), // קוד גישה — מוצפן
+    status: vol.status,
+    addedDate: vol.addedDate,
+    // נתונים רגישים — מוצפנים
+    _phone: encryptData(vol.phone || ''),
+    _id: encryptData(vol.id || ''),
+    _personalNum: encryptData(vol.personalNum || ''),
+  };
+}
+
+function decryptVolunteer(vol){
+  return {
+    ...vol,
+    accessCode: decryptData(vol.accessCode),
+    phone: decryptData(vol._phone || ''),
+    id: decryptData(vol._id || ''),
+    personalNum: decryptData(vol._personalNum || ''),
+  };
+}
+
 function generateAccessCode(){
   const code = String(Math.floor(1000 + Math.random() * 9000));
   document.getElementById('vol-access-code').value = code;
@@ -2405,21 +2452,21 @@ function addVolunteerToList(){
   if(accessCode.length !== 4 || !/^\d+$/.test(accessCode)){
     showToast('קוד גישה חייב להיות 4 ספרות','error'); return;
   }
-  if(volunteers.find(v=>v.accessCode===accessCode)){
+  // בדוק כפילויות (מפענח את הקודים לבדיקה)
+  const decrypted = volunteers.map(decryptVolunteer);
+  if(decrypted.find(v=>v.accessCode===accessCode)){
     showToast('קוד גישה כבר קיים — בחר קוד אחר','error'); return;
   }
-  if(volunteers.find(v=>v.id===id)){
+  if(decrypted.find(v=>v.id===id)){
     showToast('תעודת זהות כבר קיימת במערכת','error'); return;
   }
 
-  volunteers.push({
-    firstName, lastName, phone, id, personalNum, accessCode, status,
-    addedDate: formatDate(today)
-  });
+  const newVol = { firstName, lastName, phone, id, personalNum, accessCode, status, addedDate: formatDate(today) };
+  const encrypted = encryptVolunteer(newVol);
+  volunteers.push(encrypted);
 
-  // נקה שדות
-  ['vol-first-name','vol-last-name','vol-phone','vol-id','vol-personal-num','vol-access-code'].forEach(id=>{
-    document.getElementById(id).value='';
+  ['vol-first-name','vol-last-name','vol-phone','vol-id','vol-personal-num','vol-access-code'].forEach(fieldId=>{
+    document.getElementById(fieldId).value='';
   });
 
   showToast(`✅ ${firstName} ${lastName} נוסף למערכת`,'success');
@@ -2432,6 +2479,8 @@ function renderVolMgmtList(){
     document.getElementById('vol-mgmt-list').innerHTML='<p style="font-size:12px;color:var(--gray-500)">אין מתנדבים רשומים</p>';
     return;
   }
+  // פענח לתצוגה — רק המנהל רואה את זה
+  const decrypted = volunteers.map(decryptVolunteer);
   let html=`
     <div style="overflow-x:auto;margin-top:8px">
     <table class="volunteer-table" style="font-size:12px">
@@ -2443,7 +2492,7 @@ function renderVolMgmtList(){
         </tr>
       </thead>
       <tbody>`;
-  volunteers.forEach((v,i)=>{
+  decrypted.forEach((v,i)=>{
     html+=`<tr>
       <td>${v.firstName}</td>
       <td>${v.lastName}</td>
@@ -2465,14 +2514,16 @@ function renderVolMgmtList(){
 function toggleVolStatus(idx){
   volunteers[idx].status = volunteers[idx].status==='active'?'inactive':'active';
   showToast(`סטטוס עודכן`,'success');
+  saveToFirebase('volunteers', volunteers);
   renderVolMgmtList();
 }
 
 function removeVolunteer(idx){
-  const v = volunteers[idx];
+  const v = decryptVolunteer(volunteers[idx]);
   if(!confirm(`למחוק את ${v.firstName} ${v.lastName} מהמערכת?`)) return;
   volunteers.splice(idx,1);
   showToast('המתנדב הוסר','success');
+  saveToFirebase('volunteers', volunteers);
   renderVolMgmtList();
 }
 
