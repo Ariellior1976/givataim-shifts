@@ -941,10 +941,7 @@ const ADMIN_PASSWORD = (()=>{
     firstName, lastName, phone, id, personalNum, accessCode, status, addedDate
   }]
 */
-let volunteers = [
-  { firstName:'ישראל', lastName:'ישראלי', phone:'050-0000001', id:'000000001', personalNum:'', accessCode:'1111', status:'active', addedDate:'2026-01-01' },
-  { firstName:'שרה', lastName:'כהן', phone:'052-0000002', id:'000000002', personalNum:'V-042', accessCode:'2222', status:'active', addedDate:'2026-01-01' },
-];
+let volunteers = [];
 
 let currentVolunteer = null; // המתנדב המחובר כרגע
 let MY_NAME = 'אתה'; // יתעדכן אחרי כניסה
@@ -2441,27 +2438,26 @@ function addVolunteerToList(){
   const firstName = document.getElementById('vol-first-name').value.trim();
   const lastName  = document.getElementById('vol-last-name').value.trim();
   const phone     = document.getElementById('vol-phone').value.trim();
-  const id        = document.getElementById('vol-id').value.trim();
+  const volId     = document.getElementById('vol-id').value.trim();
   const personalNum = document.getElementById('vol-personal-num').value.trim();
   const accessCode  = document.getElementById('vol-access-code').value.trim();
   const status      = document.getElementById('vol-status').value;
 
-  if(!firstName||!lastName||!phone||!id||!accessCode){
+  if(!firstName||!lastName||!phone||!volId||!accessCode){
     showToast('יש למלא שם פרטי, שם משפחה, נייד, ת.ז וקוד גישה','error'); return;
   }
   if(accessCode.length !== 4 || !/^\d+$/.test(accessCode)){
     showToast('קוד גישה חייב להיות 4 ספרות','error'); return;
   }
-  // בדוק כפילויות (מפענח את הקודים לבדיקה)
   const decrypted = volunteers.map(decryptVolunteer);
   if(decrypted.find(v=>v.accessCode===accessCode)){
     showToast('קוד גישה כבר קיים — בחר קוד אחר','error'); return;
   }
-  if(decrypted.find(v=>v.id===id)){
+  if(decrypted.find(v=>v.id===volId)){
     showToast('תעודת זהות כבר קיימת במערכת','error'); return;
   }
 
-  const newVol = { firstName, lastName, phone, id, personalNum, accessCode, status, addedDate: formatDate(today) };
+  const newVol = { firstName, lastName, phone, id: volId, personalNum, accessCode, status, addedDate: formatDate(today) };
   const encrypted = encryptVolunteer(newVol);
   volunteers.push(encrypted);
 
