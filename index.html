@@ -2560,19 +2560,26 @@ function showToast(msg,type=''){
 // INIT WITH FIREBASE
 // ============================================================
 function initApp(){
-  // טען מתנדבים מ-Firebase לפני הצגת מסך הכניסה
-  db.ref('volunteers').once('value').then(snap => {
+  // הצג מסך טעינה
+  const loginScreen = document.getElementById('vol-login-screen');
+  if(loginScreen){
+    loginScreen.style.display = 'none';
+  }
+
+  // טען מתנדבים מ-Firebase — חכה לתשובה לפני הצגת מסך כניסה
+  db.ref('volunteers').once('value', snap => {
     const data = snap.val();
     if(data) {
       const vals = Array.isArray(data) ? data : Object.values(data);
       volunteers = vals.filter(Boolean);
     }
-    initVolunteerLogin();
+    // עכשיו הצג מסך כניסה
+    if(loginScreen) loginScreen.style.display = 'flex';
+    setTimeout(()=>document.getElementById('vol-code-input')?.focus(), 300);
     renderStats(); renderWeek(); renderDailyView(); renderMonth(); renderEvents(); renderMine();
-  }).catch(() => {
-    // אם Firebase לא זמין — הצג מסך כניסה בכל מקרה
-    initVolunteerLogin();
-    renderStats(); renderWeek(); renderDailyView(); renderMonth(); renderEvents(); renderMine();
+  }, error => {
+    console.warn('Firebase load error:', error);
+    if(loginScreen) loginScreen.style.display = 'flex';
   });
 }
 
